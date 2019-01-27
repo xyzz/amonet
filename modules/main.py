@@ -74,8 +74,8 @@ def main():
     log("Check rpmb")
     rpmb = dev.rpmb_read()
     if rpmb[0:4] != b"AMZN":
-        dev.reboot()
-        raise RuntimeError("rpmb is broken, did the device never boot?")
+        log("rpmb looks broken; if this is expected (i.e. you're retrying the exploit) press enter, otherwise terminate with Ctrl+C")
+        input()
 
     # 4) Zero out rpmb to enable downgrade
     log("Downgrade rpmb")
