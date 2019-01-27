@@ -8,7 +8,7 @@ import serial
 from logger import log
 
 BAUD = 115200
-TIMEOUT = 0.5
+TIMEOUT = 5
 
 
 CRYPTO_BASE = 0x10210000 # for karnak
@@ -42,6 +42,10 @@ def serial_ports ():
             pass
 
     return result
+
+
+def p32_be(x):
+    return struct.pack(">I", x)
 
 
 class Device:
@@ -157,3 +161,76 @@ class Device:
         self.check(self.dev.read(1), cmd)
         self.dev.read(1)
         self.dev.read(2)
+
+    def wait_payload(self):
+        data = self.dev.read(4)
+        if data != b"\xB1\xB2\xB3\xB4":
+            raise RuntimeError("received {} instead of expected pattern".format(data))
+
+    def emmc_read(self, idx):
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x1000))
+        # block to read
+        self.dev.write(p32_be(idx))
+
+        data = self.dev.read(0x200)
+        if len(data) != 0x200:
+            raise RuntimeError("read fail")
+
+        return data
+
+    def emmc_write(self, idx, data):
+        if len(data) != 0x200:
+            raise RuntimeError("data must be 0x200 bytes")
+
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x1001))
+        # block to write
+        self.dev.write(p32_be(idx))
+        # data
+        self.dev.write(data)
+
+        code = self.dev.read(4)
+        if code != b"\xd0\xd0\xd0\xd0":
+            raise RuntimeError("device failure")
+
+    def emmc_switch(self, part):
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x1002))
+        # partition
+        self.dev.write(p32_be(part))
+
+    def reboot(self):
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x3000))        
+
+    def rpmb_read(self):
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x2000))
+
+        data = self.dev.read(0x100)
+        if len(data) != 0x100:
+            raise RuntimeError("read fail")
+
+        return data
+
+    def rpmb_write(self, data):
+        if len(data) != 0x100:
+            raise RuntimeError("data must be 0x100 bytes")
+
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x2001))
+        # data
+        self.dev.write(data)

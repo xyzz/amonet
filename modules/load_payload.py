@@ -76,6 +76,11 @@ def aes_write16(dev, addr, data):
 
 
 def load_payload(dev, path):
+    print("")
+    print(" * * * Remove the short and press Enter * * * ")
+    print("")
+    input()
+
     log("Init crypto engine")
     init(dev)
     hw_acquire(dev)
@@ -100,16 +105,15 @@ def load_payload(dev, path):
         word = struct.unpack("<I", word)[0]
         words.append(word)
 
-    print("")
-    print(" * * * Remove the short and press Enter * * * ")
-    print("")
-    input()
-
     log("Send payload")
     dev.write32(0x201000, words)
 
     log("Let's rock")
     dev.write32(0x1028A8, 0x201000, status_check=False)
+
+    log("Wait for the payload to come online...")
+    dev.wait_payload()
+    log("all good")
 
 
 if __name__ == "__main__":
