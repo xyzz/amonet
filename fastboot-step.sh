@@ -4,7 +4,7 @@ set -e
 
 fastboot flash boot bin/recovery-inj.img
 fastboot flash recovery bin/recovery-inj.img
-fastboot reboot
+fastboot reboot recovery
 
 echo ""
 echo ""
