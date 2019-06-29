@@ -73,8 +73,9 @@ def main():
     # 3) Sanity check rpmb
     log("Check rpmb")
     rpmb = dev.rpmb_read()
-    if rpmb[0:4] != b"AMZN":
+    if rpmb[0:4] != b"AMZN" and rpmb != b"\x00" * 0x100:
         log("rpmb looks broken; if this is expected (i.e. you're retrying the exploit) press enter, otherwise terminate with Ctrl+C")
+        log("rpmb contents = {}".format(rpmb.hex()))
         input()
 
     # 4) Zero out rpmb to enable downgrade

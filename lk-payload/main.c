@@ -21,11 +21,11 @@ void _putchar(char character)
     low_uart_put(character);
 }
 
-int (*original_read)(struct device_t *dev, uint64_t block_off, void *dst, size_t sz, int part) = (void*)0x4BD1E839;
+size_t (*original_read)(struct device_t *dev, uint64_t block_off, void *dst, uint32_t sz, uint32_t part);
 
 uint64_t g_boot, g_recovery, g_lk;
 
-int read_func(struct device_t *dev, uint64_t block_off, void *dst, size_t sz, int part) {
+size_t read_func(struct device_t *dev, uint64_t block_off, void *dst, uint32_t sz, uint32_t part) {
     printf("read_func hook\n");
     int ret = 0;
     if (block_off == g_boot * 0x200 || block_off == g_recovery * 0x200) {
@@ -50,7 +50,7 @@ static void parse_gpt() {
     uint8_t raw[0x800] = { 0 };
     struct device_t *dev = get_device();
     dev->read(dev, 0x400, raw, sizeof(raw), USER_PART);
-    for (int i = 0; i < sizeof(raw) / 0x80; ++i) {
+    for (size_t i = 0; i < sizeof(raw) / 0x80; ++i) {
         uint8_t *ptr = &raw[i * 0x80];
         uint8_t *name = ptr + 0x38;
         uint32_t start;
@@ -69,20 +69,9 @@ static void parse_gpt() {
 }
 
 int main() {
-    int ret = 0;
-    printf("This is LK-payload by xyz. Copyright 2019\n");
-
-    uint32_t **argptr = (void*)0x4BD00020;
-    uint32_t *arg = *argptr;
-    arg[0x53] = 4; // force 64-bit linux kernel
+    printf("This is LK-payload (for mustang) by xyz. Copyright 2019.\n");
 
     int fastboot = 0;
-
-    /*
-    [300] [LK/LCM] lcm_init enter, build type: PVT, vendor type: FITI_KD
-    [300] [LK/LCM] lcm_init No LCM connected. Just Return
-    [340] DSI_WaitForNotBusy:Error:DSI_INTSTA is 0...
-    */
 
     parse_gpt();
 
@@ -91,24 +80,15 @@ int main() {
         while (1) {}
     }
 
-    int (*app)() = (void*)0x4BD27109;
-
-    unsigned char overwritten[80] = {
-        0xE9, 0x0A, 0xD0, 0x4B, 0x7D, 0x0E, 0xD0, 0x4B, 0x01, 0x09, 0xD0, 0x4B, 0x31, 0x0B, 0xD0, 0x4B,
-        0x9D, 0x0C, 0xD0, 0x4B, 0x00, 0x84, 0xD5, 0x4B, 0x05, 0x0A, 0xD0, 0x4B, 0x71, 0x0A, 0xD0, 0x4B,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2D, 0x1B, 0xD0, 0x4B,
-        0xF9, 0x1C, 0xD0, 0x4B, 0xA9, 0x1A, 0xD0, 0x4B, 0x95, 0x1D, 0xD0, 0x4B, 0x19, 0x1A, 0xD0, 0x4B,
-        0xED, 0x1B, 0xD0, 0x4B, 0xA5, 0x19, 0xD0, 0x4B, 0x81, 0x1C, 0xD0, 0x4B, 0x00, 0x00, 0x00, 0x00 
-    };
-    memcpy((void*)0x4BD5C000, overwritten, sizeof(overwritten));
-
-    void *lk_dst = (void*)0x4BD00000;
-    #define LK_SIZE (0x800 * 0x200)
-
     struct device_t *dev = get_device();
 
-    uint8_t tmp[0x10] = { 0 };
-    dev->read(dev, g_boot * 0x200 + 0x400, tmp, 0x10, USER_PART);
+    // Restore the 0x4BD00200-0x4BD01200 range, a part of it was overwritten by microloader
+    // this is way more than we actually need to restore, but it shouldn't hurt
+    // we can't restore 0x4BD00000-0x4BD00200 as that contains important pointers
+    dev->read(dev, g_lk * 0x200 + 0x200 + 0x200, (char*)LK_BASE + 0x200, 0x1000, USER_PART); // +0x200 to skip lk header
+
+    char tmp[0x10] = { 0 };
+    dev->read(dev, g_boot * 0x200 + 0x400, tmp, sizeof(tmp) - 1, USER_PART);
     if (strcmp(tmp, "FASTBOOT_PLEASE") == 0) {
         printf("well since you're asking so nicely...\n");
         fastboot = 1;
@@ -118,33 +98,33 @@ int main() {
 
     // force fastboot mode
     if (fastboot) {
-        patch = (void*)0x4BD2717C;
+        patch = (void*)0x4BD27380;
         *patch = 0;
-        patch = (void*)0x4BD27182;
+        patch = (void*)0x4BD27386;
         *patch = 0;
     }
 
     // enable all commands
-    patch = (void*)0x4BD0D838;
+    patch = (void*)0x4BD0D854;
     *patch++ = 0x2000; // movs r0, #0
     *patch = 0x4770;   // bx lr
 
     // device is unlocked
-    patch = (void*)0x4BD01E84;
+    patch = (void*)0x4BD01EA0;
     *patch++ = 0x2001; // movs r0, #1
     *patch = 0x4770;   // bx lr
 
     // hook bootimg read function
     uint32_t *patch32;
+    original_read = dev->read;
     patch32 = (void*)&dev->read;
     *patch32 = (uint32_t)read_func;
 
-    patch32 = (void*)0x4BD681B8;
-    *patch32 = 1; // // force 64-bit linux kernel
-
     printf("Clean lk\n");
-    cache_clean(lk_dst, LK_SIZE);
+    cache_clean((void*)LK_BASE, LK_SIZE);
 
+    printf("Jump lk\n");
+    int (*app)() = (void*)0x4BD2730D;
     app();
 
     while (1) {
