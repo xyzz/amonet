@@ -11,6 +11,7 @@ def switch_boot0(dev):
     if block[0:9] != b"EMMC_BOOT" and block[0:9] != b"xyzxyzxyz":
         dev.reboot()
         raise RuntimeError("what's wrong with your BOOT0?")
+    dev.kick_watchdog()
 
 def flash_data(dev, data, start_block, max_size=0):
     if max_size and len(data) > max_size:
@@ -20,6 +21,8 @@ def flash_data(dev, data, start_block, max_size=0):
     for x in range(blocks):
         print("[{} / {}]".format(x + 1, blocks), end='\r')
         dev.emmc_write(start_block + x, data[x * 0x200:(x + 1) * 0x200])
+        if x % 10 == 0:
+            dev.kick_watchdog()
     print("")
 
 def read_file(path):
@@ -38,6 +41,7 @@ def switch_user(dev):
     if block[510:512] != b"\x55\xAA":
         dev.reboot()
         raise RuntimeError("what's wrong with your GPT?")
+    dev.kick_watchdog()
 
 def parse_gpt(dev):
     data = dev.emmc_read(0x400 // 0x200) + dev.emmc_read(0x600 // 0x200) + dev.emmc_read(0x800 // 0x200) + dev.emmc_read(0xA00 // 0x200)
@@ -60,6 +64,7 @@ def main():
 
     # 0.2) Load brom payload
     load_payload(dev, "../brom-payload/build/payload.bin")
+    dev.kick_watchdog()
 
     # 1) Sanity check GPT
     log("Check GPT")
@@ -92,6 +97,7 @@ def main():
         dev.reboot()
         raise RuntimeError("downgrade failure, giving up")
     log("rpmb downgrade ok")
+    dev.kick_watchdog()
 
     # 5) Brick the boot partition temporarily
     # so that if the exploit fails, it goes back to bootrom mode

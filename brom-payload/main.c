@@ -155,6 +155,12 @@ int main() {
 
             }
         }
+        case 0x3001: {
+            printf("Kick watchdog\n");
+            volatile uint32_t *reg = (volatile uint32_t *)0x10007000;
+            reg[8/4] = 0x1971;
+            break;
+        }
         default:
             printf("Invalid command\n");
             break;

@@ -1,4 +1,6 @@
 import struct
+import time
+import threading
 
 from common import CRYPTO_BASE
 
@@ -75,11 +77,27 @@ def aes_write16(dev, addr, data):
         raise RuntimeError("failed to call the function!")
 
 
+class UserInputThread(threading.Thread):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.done = False
+
+    def run(self):
+        print("")
+        print(" * * * If you have a short attached, remove it now * * * ")
+        print(" * * * Press Enter to continue * * * ")
+        print("")
+        input()
+        self.done = True
+
+
 def load_payload(dev, path):
-    print("")
-    print(" * * * Remove the short and press Enter * * * ")
-    print("")
-    input()
+    thread = UserInputThread()
+    thread.start()
+    while not thread.done:
+        dev.write32(0x10007008, 0x1971) # low-level watchdog kick
+        time.sleep(1)
 
     log("Init crypto engine")
     init(dev)
