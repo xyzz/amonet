@@ -22,7 +22,7 @@ def check_modemmanager():
 def switch_boot0(dev):
     dev.emmc_switch(1)
     block = dev.emmc_read(0)
-    if block[0:9] != b"EMMC_BOOT" and block[0:9] != b"xyzxyzxyz":
+    if block[0:9] != b"EMMC_BOOT" and block[0:9] != b"xyzxyzxyz" and block != b"\x00" * 0x200:
         dev.reboot()
         raise RuntimeError("what's wrong with your BOOT0?")
     dev.kick_watchdog()
