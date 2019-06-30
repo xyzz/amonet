@@ -8,16 +8,11 @@ from logger import log
 def switch_boot0(dev):
     dev.emmc_switch(1)
     block = dev.emmc_read(0)
-    if block[0:9] != b"EMMC_BOOT":
+    if block[0:9] != b"EMMC_BOOT" and block[0:9] != b"xyzxyzxyz":
         dev.reboot()
         raise RuntimeError("what's wrong with your BOOT0?")
 
-def flash_binary(dev, path, start_block, max_size=0):
-    with open(path, "rb") as fin:
-        data = fin.read()
-    while len(data) % 0x200 != 0:
-        data += b"\x00"
-
+def flash_data(dev, data, start_block, max_size=0):
     if max_size and len(data) > max_size:
         raise RuntimeError("data too big to flash")
 
@@ -26,6 +21,16 @@ def flash_binary(dev, path, start_block, max_size=0):
         print("[{} / {}]".format(x + 1, blocks), end='\r')
         dev.emmc_write(start_block + x, data[x * 0x200:(x + 1) * 0x200])
     print("")
+
+def read_file(path):
+    with open(path, "rb") as fin:
+        data = fin.read()
+    while len(data) % 0x200 != 0:
+        data += b"\x00"
+    return data
+
+def flash_binary(dev, path, start_block, max_size=0):
+    flash_data(dev, read_file(path), start_block, max_size)
 
 def switch_user(dev):
     dev.emmc_switch(0)
@@ -88,15 +93,19 @@ def main():
         raise RuntimeError("downgrade failure, giving up")
     log("rpmb downgrade ok")
 
-    # 5) Install lk-payload
+    # 5) Brick the boot partition temporarily
+    # so that if the exploit fails, it goes back to bootrom mode
+    boot0_eraser = b"xyzxyzxyz" + b"\x00" * (0x200 - 9)
+    switch_boot0(dev)
+    log("Clear preloader 1")
+    flash_data(dev, boot0_eraser, 0) # 1st backup
+    log("Clear preloader 2")
+    flash_data(dev, boot0_eraser, 4) # 2nd backup
+
+    # 6) Install lk-payload
     log("Flash lk-payload")
     switch_boot0(dev)
     flash_binary(dev, "../lk-payload/build/payload.bin", 0x200000 // 0x200)
-
-    # 6) Downgrade preloader
-    log("Flash preloader")
-    switch_boot0(dev)
-    flash_binary(dev, "../bin/boot0-short.bin", 0)
 
     # 7) Downgrade tz
     log("Flash tz")
@@ -113,7 +122,15 @@ def main():
     switch_user(dev)
     flash_binary(dev, "../bin/microloader.bin", gpt["boot"][0], gpt["boot"][1] * 0x200)
 
-    # Reboot (to fastboot)
+    # 10) Downgrade preloader
+    log("Flash preloader")
+    boot0_data = read_file("../bin/boot0-short.bin")
+    switch_boot0(dev)
+    flash_data(dev, boot0_data[0x1000:], 8)
+    log("Restore preloader")
+    flash_data(dev, boot0_data[:0x1000], 0)
+
+    # 11) Reboot (to fastboot)
     log("Reboot to unlocked fastboot")
     dev.reboot()
 
