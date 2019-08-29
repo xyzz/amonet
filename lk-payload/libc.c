@@ -59,10 +59,14 @@ void*  memset(void*  dst, int c, u32_t n)
     char*  end = q + n;
 
     for (;;) {
-        if (q >= end) break; *q++ = (char) c;
-        if (q >= end) break; *q++ = (char) c;
-        if (q >= end) break; *q++ = (char) c;
-        if (q >= end) break; *q++ = (char) c;
+        if (q >= end) break;
+        *q++ = (char) c;
+        if (q >= end) break;
+        *q++ = (char) c;
+        if (q >= end) break;
+        *q++ = (char) c;
+        if (q >= end) break;
+        *q++ = (char) c;
     }
 
   return dst;

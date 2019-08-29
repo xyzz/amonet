@@ -26,30 +26,20 @@ void _putchar(char character)
 }
 
 void hex_dump(const void* data, size_t size) {
-    char ascii[17];
     size_t i, j;
-    ascii[16] = '\0';
     for (i = 0; i < size; ++i) {
         printf("%02X ", ((unsigned char*)data)[i]);
-        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-            ascii[i % 16] = ((unsigned char*)data)[i];
-        } else {
-            ascii[i % 16] = '.';
-        }
         if ((i+1) % 8 == 0 || i+1 == size) {
             printf(" ");
             if ((i+1) % 16 == 0) {
                 printf("\n");
-                // printf("|  %s \n", ascii);
             } else if (i+1 == size) {
-                ascii[(i+1) % 16] = '\0';
                 if ((i+1) % 16 <= 8) {
                     printf(" ");
                 }
                 for (j = (i+1) % 16; j < 16; ++j) {
                     printf("   ");
                 }
-                // printf("|  %s \n", ascii);
                 printf("\n");
             }
         }
@@ -61,18 +51,18 @@ void sleepy(void) {
     for (volatile int i = 0; i < 0x80000; ++i) {}
 }
 
-#if 1
 void mdelay (unsigned long msec)
 {
-   sleepy();
+    (void)msec;
+    sleepy();
 }
 
 /* delay usec useconds */
 void udelay (unsigned long usec)
 {
-   sleepy();
+    (void)usec;
+    sleepy();
 }
-#endif
 
 int main() {
     char buf[0x200] = { 0 };
@@ -164,6 +154,12 @@ int main() {
             while (1) {
 
             }
+        }
+        case 0x3001: {
+            printf("Kick watchdog\n");
+            volatile uint32_t *reg = (volatile uint32_t *)0x10007000;
+            reg[8/4] = 0x1971;
+            break;
         }
         default:
             printf("Invalid command\n");

@@ -5,6 +5,7 @@
 #include "mmc.h"
 #include "errno.h"
 #include "mt_sd.h"
+#include "../crypto/hmac-sha256.h"
 
 #define be32_to_cpup(addr) __builtin_bswap32(*(uint32_t*)addr)
 #define be16_to_cpup(addr) __builtin_bswap16(*(uint16_t*)addr)
@@ -12,6 +13,8 @@
 #define cpu_to_be32p be32_to_cpup
 
 unsigned int msdc_cmd(struct msdc_host *host, struct mmc_command *cmd);
+void sleepy(void);
+void hex_dump(const void* data, size_t size);
 
 int mmc_go_idle(struct msdc_host *host)
 {
@@ -483,6 +486,7 @@ out:
 static int mmc_rpmb_request_check(struct msdc_host *host,
         struct mmc_ioc_rpmb_req *p_req)
 {
+    (void)host;
     /*
      * Some parameters are a must for the operation. Different
      * operation expect different paramters. Below code is
@@ -692,7 +696,7 @@ int mmc_rpmb_get_write_count(struct msdc_host *host, uint32_t *wc) {
     struct mmc_ioc_rpmb_req req = { 0 };
     int ret = 0;
     uint16_t result = 0;
-    char nonce[32] = { 0 };
+    uint8_t nonce[32] = { 0 };
     req.type = RPMB_GET_WRITE_COUNTER;
     req.wc = wc;
     req.result = &result;
@@ -740,7 +744,7 @@ int mmc_rpmb_read(struct msdc_host *host, void *buf) {
     struct mmc_ioc_rpmb_req req = { 0 };
     int ret = 0;
     uint16_t result = 0;
-    char nonce[32] = { 0 };
+    uint8_t nonce[32] = { 0 };
     req.type = RPMB_READ_DATA;
     req.blk_cnt = 1;
     req.result = &result;
@@ -838,7 +842,7 @@ static void sej_init(int arg) {
 
 static void sej_run(uint32_t *buf1, size_t len, char *buf2) {
     char *i;
-    for ( i = buf2; i - buf2 < len; *(uint32_t *)(i - 4) = sdr_read32(0x1000A05C) )
+    for ( i = buf2; (size_t)(i - buf2) < len; *(uint32_t *)(i - 4) = sdr_read32(0x1000A05C) )
     {
         sdr_write32(0x1000A010, buf1[0]);
         sdr_write32(0x1000A014, buf1[1]);
@@ -909,8 +913,8 @@ int mmc_rpmb_write(struct msdc_host *host, void *buf) {
     struct mmc_ioc_rpmb_req req = { 0 };
     int ret = 0;
     uint16_t result = 0;
-    char nonce[32] = { 0 };
-    char mac[32] = { 0 };
+    uint8_t nonce[32] = { 0 };
+    uint8_t mac[32] = { 0 };
     uint32_t wc;
 
     uint8_t tmp[0x100];
@@ -1023,7 +1027,7 @@ int mmc_init(struct msdc_host *host) {
     uint32_t cid_be[4] = { 0 };
     for (int i = 0; i < 4; ++i)
         cid_be[i] = __builtin_bswap32(cid[i]);
-    derive_rpmb_key(cid_be);
+    derive_rpmb_key((void*)cid_be);
 
     ret = mmc_set_relative_addr(host, 1);
     printf("SET_RELATIVE_ADDR = 0x%08X\n", ret);

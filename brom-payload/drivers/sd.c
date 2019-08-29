@@ -43,6 +43,8 @@ static int msdc_rsp[] = {
 
 static void msdc_dump_info() {}
 
+void mdelay (unsigned long msec);
+
 #define msdc_retry(expr, retry, cnt,id) \
     do { \
         int backup = cnt; \
@@ -165,7 +167,6 @@ int msdc_pio_read(struct msdc_host *host, void *buf)
 
         break;
     }
-end:
     // data->bytes_xfered += size;
     N_MSG(FIO, "        PIO Read<%d>bytes\n", size);
         
@@ -180,7 +181,6 @@ end:
 */
 int msdc_pio_write(struct msdc_host* host, void *buf)
 {
-    u32  base = host->base;
     u32  num = 1;
     u32 *ptr;
     u8  *u8ptr;
@@ -251,7 +251,6 @@ int msdc_pio_write(struct msdc_host* host, void *buf)
 
         break;
     }
-end:    
     // data->bytes_xfered += size;
     N_MSG(FIO, "        PIO Write<%d>bytes\n", size);
     if (size != 0x200)
@@ -270,7 +269,9 @@ static unsigned int msdc_command_start(struct msdc_host   *host,
                                       int                 tune,   /* not used */
                                       unsigned long       timeout)
 {
-    u32 base = host->base;
+    (void)tune;
+    (void)timeout;
+
     u32 opcode = cmd->opcode;
     u32 rawcmd;
     u32 rawarg;
@@ -471,12 +472,9 @@ static unsigned int msdc_command_resp_polling(struct msdc_host   *host,
         int                 tune,
         unsigned long       timeout)
 {
-    u32 base = host->base;
+    (void)tune;
+    (void)timeout;
     u32 intsts;
-    u32 resp;
-    //u32 status;
-    // unsigned long tmo;
-    //struct mmc_data   *data = host->data;
 
     u32 cmdsts = MSDC_INT_CMDRDY  | MSDC_INT_RSPCRCERR  | MSDC_INT_CMDTMO;     
 
@@ -491,8 +489,6 @@ static unsigned int msdc_command_resp_polling(struct msdc_host   *host,
     }
 #endif
 
-
-    resp = host->cmd_rsp;
 
     /*polling*/
     // tmo = jiffies + timeout;
@@ -615,7 +611,6 @@ static unsigned int msdc_command_resp_polling(struct msdc_host   *host,
         }
 #endif /* end of MTK_MSDC_USE_CMD23 */
     }
-out:
     host->cmd = NULL;
 
     return cmd->error;
@@ -648,7 +643,6 @@ unsigned int msdc_cmd(struct msdc_host *host, struct mmc_command *cmd) {
 
 void msdc_set_blknum(struct msdc_host *host, u32 blknum)
 {
-    u32 base = host->base;
-
+    (void)host;
     sdr_write32(SDC_BLK_NUM, blknum);
 }

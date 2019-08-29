@@ -212,6 +212,12 @@ class Device:
         # cmd
         self.dev.write(p32_be(0x3000))        
 
+    def kick_watchdog(self):
+        # magic
+        self.dev.write(p32_be(0xf00dd00d))
+        # cmd
+        self.dev.write(p32_be(0x3001))
+
     def rpmb_read(self):
         # magic
         self.dev.write(p32_be(0xf00dd00d))

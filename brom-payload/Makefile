@@ -3,7 +3,7 @@ AS := arm-none-eabi-as
 LD := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
 
-CFLAGS := -std=gnu99 -Os -mthumb -mcpu=cortex-a9 -fno-builtin-printf -fno-strict-aliasing -fno-builtin-memcpy -mno-unaligned-access
+CFLAGS := -std=gnu99 -Os -mthumb -mcpu=cortex-a9 -fno-builtin-printf -fno-strict-aliasing -fno-builtin-memcpy -mno-unaligned-access -Wall -Wextra
 LDFLAGS := -T linker.x -nodefaultlibs -nostdlib -lgcc
 
 BUILD_DIR := ./build
